@@ -182,7 +182,8 @@ def local_only(path, patterns):
     ahead = git_text(path, "rev-list", "--count", "HEAD", "--branches", "--not", "--remotes")
     if ahead != "0":
         reasons.append(f"{ahead} commits fora do remoto" if ahead else "commits não conferidos")
-    ignored = git_text(path, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory")
+    ignored = git_text(path, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory",
+                       "--no-empty-directory")
     kept = [entry for entry in (ignored or "").splitlines() if entry and not disposable(entry, patterns)]
     if ignored is None or kept:
         more = f" e mais {len(kept) - 3}" if len(kept) > 3 else ""
