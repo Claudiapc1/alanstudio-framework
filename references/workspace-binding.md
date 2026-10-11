@@ -110,7 +110,8 @@ alterar nada. Com `--apply`, só os módulos dos perfis ficam ativos (`submodule
 histórico local de cada módulo de fora são apagados só quando o remoto tem tudo: sem
 alteração, stash, worktree extra, commit fora do remoto nem arquivo ignorado que não se
 refaz (dependências, caches e builds se refazem; `disposable` no manifesto acrescenta
-padrões). O resto fica no disco, desligado, com o motivo. `get` religa o módulo, e o
+padrões). O resto fica no disco, desligado, com o motivo. Um módulo que precisa de outro para
+compilar ou testar declara `requires` no manifesto; `profile` e `get` trazem a dependência junto. `get` religa o módulo, e o
 perfil aplicado fica em `workspace.profile` no Git local.
 
 [gameops.py](../scripts/gameops.py) opera o Git do hub e dos módulos presentes:

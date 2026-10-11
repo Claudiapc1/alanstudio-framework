@@ -69,12 +69,17 @@ def parent_of(module, modules):
 
 
 def selection(names, modules):
-    selected = []
-    for name in names:
+    """Módulos pedidos com seus pais e, de forma transitiva, o que cada um declara em `requires`."""
+    selected, pending, seen = [], list(names), set()
+    while pending:
+        name = pending.pop(0)
         module = next((item for item in modules
                        if name in (item["id"], item["path"])), None)
         if module is None:
             raise ValueError(f"Módulo desconhecido: {name}. Use workspace.py list.")
+        if module["id"] in seen:
+            continue
+        seen.add(module["id"])
         chain = []
         while module:
             chain.append(module)
@@ -82,6 +87,7 @@ def selection(names, modules):
         for item in reversed(chain):
             if item not in selected:
                 selected.append(item)
+            pending.extend(item.get("requires") or [])
     return selected
 
 

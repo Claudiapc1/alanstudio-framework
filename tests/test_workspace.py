@@ -214,6 +214,21 @@ class WorkspaceTest(unittest.TestCase):
         for entry in (".env", "assets/animations/", "originals/abc", "evidence/regua.json"):
             self.assertFalse(workspace.disposable(entry, patterns), entry)
 
+    def test_selection_follows_requires_transitively_and_rejects_unknown(self):
+        modules = [{"id": "alpha", "path": "games/alpha", "requires": ["beta"]},
+                   {"id": "alpha-qa", "path": "games/alpha/qa"},
+                   {"id": "beta", "path": "games/beta", "requires": ["alpha", "alpha-qa"]},
+                   {"id": "gamma", "path": "games/gamma", "requires": ["missing"]}]
+        self.assertEqual([item["id"] for item in workspace.selection(["alpha"], modules)],
+                         ["alpha", "beta", "alpha-qa"])
+        with self.assertRaisesRegex(ValueError, "missing"):
+            workspace.selection(["gamma"], modules)
+
+    def test_profile_keeps_what_a_kept_module_requires(self):
+        root, data = self.profile_checkout("alpha", "beta")
+        self.modules[0]["requires"] = ["beta"]
+        self.assertEqual(self.actions(root, data, "a")["beta"], ("manter", []))
+
     def test_legacy_checkout_is_not_mistaken_for_a_submodule_hub(self):
         with self.assertRaisesRegex(ValueError, "não modularizado"):
             workspace.get_modules(self.source, ["alpha"], self.modules)
