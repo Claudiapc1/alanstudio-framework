@@ -111,7 +111,11 @@ histórico local de cada módulo de fora são apagados só quando o remoto tem t
 alteração, stash, worktree extra, commit fora do remoto nem arquivo ignorado que não se
 refaz (dependências, caches e builds se refazem; `disposable` no manifesto acrescenta
 padrões). O resto fica no disco, desligado, com o motivo. Um módulo que precisa de outro para
-compilar ou testar declara `requires` no manifesto; `profile` e `get` trazem a dependência junto. `get` religa o módulo, e o
+compilar ou testar declara `requires` no manifesto; `profile` e `get` trazem a dependência junto.
+Quando a máquina precisa só de uma parte de um módulo (uma ferramenta dentro de uma biblioteca grande), o
+perfil declara `sparse: {<id>: [pastas]}`: o módulo vem raso, sem blobs fora dessas pastas, no commit do
+gitlink e com o layout normal de submódulo (o modo cone também traz os arquivos da raiz). Um perfil que pede o
+módulo inteiro vence. `get` religa o módulo, e o
 perfil aplicado fica em `workspace.profile` no Git local.
 
 [gameops.py](../scripts/gameops.py) opera o Git do hub e dos módulos presentes:

@@ -119,8 +119,31 @@ def set_active(root, module, modules, active):
                        check=True, capture_output=True)
 
 
-def get_modules(root, names, modules):
+def sparse_clone(root, module, modules, paths):
+    """Baixa só as pastas pedidas do módulo, no commit do gitlink, com o layout de um submódulo."""
+    owner, relative = owner_of(root, module, modules)
+    target = Path(root) / module["path"]
+    subprocess.run(["git", "-C", str(owner), "submodule", "init", "--", relative], check=True, capture_output=True)
+    url = git_text(owner, "config", f"submodule.{module['id']}.url")
+    commit = git_text(owner, "rev-parse", f"HEAD:{relative}")
+    store = Path(git_text(owner, "rev-parse", "--path-format=absolute", "--git-common-dir")) / "modules" / module["id"]
+    if not url or not commit or store.exists():
+        raise ValueError(f"Não foi possível preparar o checkout parcial de {module['path']}.")
+    target.mkdir(parents=True, exist_ok=True)
+    git = ["git", "-c", "submodule.recurse=false"]
+    subprocess.run([*git, "clone", "-q", "--no-checkout", "--depth", "1", "--filter=blob:none",
+                    "--separate-git-dir", str(store), url, str(target)], check=True)
+    subprocess.run([*git, "-C", str(target), "sparse-checkout", "set", "--cone", *paths], check=True)
+    subprocess.run([*git, "-C", str(target), "fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", commit],
+                   check=True)
+    subprocess.run([*git, "-C", str(target), "checkout", "-q", "--detach", commit], check=True)
+    subprocess.run(["git", "--git-dir", str(store), "config", "core.worktree",
+                    os.path.relpath(target, store)], check=True)
+
+
+def get_modules(root, names, modules, sparse=None):
     root = Path(root).resolve()
+    sparse = sparse or {}
     for module in selection(names, modules):
         target = root / module["path"]
         if not target.resolve().is_relative_to(root):
@@ -135,6 +158,9 @@ def get_modules(root, names, modules):
         set_active(root, module, modules, True)
         if (target / ".git").exists():
             print(f"presente: {module['path']} (versão local preservada)")
+            continue
+        if module["id"] in sparse:
+            sparse_clone(root, module, modules, sparse[module["id"]])
             continue
         subprocess.run(
             ["git", "-C", str(owner), "-c", "submodule.recurse=false",
@@ -158,7 +184,28 @@ def profile_names(data, names):
             known = ", ".join(sorted(profiles)) or "nenhum"
             raise ValueError(f"Perfil desconhecido: {name}. Perfis do workspace.json: {known}.")
         wanted.extend(profile["modules"])
+        wanted.extend(profile.get("sparse") or {})
     return wanted
+
+
+def profile_sparse(data, names):
+    """Pastas por módulo quando os perfis pedem só parte dele; um perfil que pede o módulo inteiro vence."""
+    profiles = data.get("profiles") or {}
+    sparse, whole = {}, set()
+    for name in names:
+        profile = profiles.get(name) or {}
+        whole.update(profile.get("modules") or [])
+        for module, paths in (profile.get("sparse") or {}).items():
+            if not isinstance(paths, list) or not paths or not all(isinstance(item, str) and item for item in paths):
+                raise ValueError(f"sparse de {module} no perfil {name} precisa ser uma lista de pastas")
+            sparse.setdefault(module, set()).update(paths)
+    by_path = {}
+    for module in data["modules"]:
+        for key in (module["id"], module["path"]):
+            by_path[key] = module["id"]
+    whole = {by_path.get(item, item) for item in whole}
+    return {by_path.get(module, module): sorted(paths) for module, paths in sparse.items()
+            if by_path.get(module, module) not in whole}
 
 
 def disposable(entry, patterns):
@@ -253,7 +300,7 @@ def apply_profile(root, data, names, prune=False):
     rows = profile_plan(root, data, names)
     missing = [row["id"] for row in rows if row["action"] == "baixar"]
     if missing:
-        get_modules(root, missing, modules)
+        get_modules(root, missing, modules, profile_sparse(data, names))
     patterns = DISPOSABLE + tuple(data.get("disposable") or ())
     for row in sorted(rows, key=lambda row: -len(PurePosixPath(row["path"]).parts)):
         module = by_id[row["id"]]

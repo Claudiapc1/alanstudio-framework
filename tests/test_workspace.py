@@ -229,6 +229,26 @@ class WorkspaceTest(unittest.TestCase):
         self.modules[0]["requires"] = ["beta"]
         self.assertEqual(self.actions(root, data, "a")["beta"], ("manter", []))
 
+    def test_profile_downloads_only_the_sparse_folders_of_a_module(self):
+        self.write("games/beta/lab/tool.txt", "tool\n")
+        self.write("games/beta/assets/big.bin", "heavy\n")
+        self.git(self.source, "add", ".")
+        self.git(self.source, "commit", "-m", "lab")
+        root, data = self.profile_checkout("alpha")
+        data["profiles"]["s"] = {"modules": ["alpha"], "sparse": {"beta": ["lab"]}}
+        rows = {row["id"]: row["action"] for row in workspace.apply_profile(root, data, ["s"], prune=True)}
+        self.assertEqual(rows["beta"], "baixar")
+        self.assertEqual((root / "games/beta/lab/tool.txt").read_text(), "tool\n")
+        self.assertFalse((root / "games/beta/assets").exists())
+        self.assertTrue((root / "games/beta/main.txt").exists())  # o modo cone sempre traz a raiz
+        self.assertEqual(self.git(root / "games/beta", "rev-parse", "HEAD"),
+                         self.git(root, "rev-parse", "HEAD:games/beta"))
+        self.assertEqual(self.git(root, "submodule", "status", "--", "games/beta")[0], self.git(root, "rev-parse", "HEAD:games/beta")[0])
+        self.assertEqual(self.git(root, "config", "submodule.beta.active"), "true")
+        self.assertEqual(self.actions(root, data, "s")["beta"], ("manter", []))
+        data["profiles"]["inteiro"] = {"modules": ["beta"]}
+        self.assertEqual(workspace.profile_sparse(data, ["s", "inteiro"]), {})
+
     def test_legacy_checkout_is_not_mistaken_for_a_submodule_hub(self):
         with self.assertRaisesRegex(ValueError, "não modularizado"):
             workspace.get_modules(self.source, ["alpha"], self.modules)
