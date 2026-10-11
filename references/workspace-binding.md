@@ -115,7 +115,8 @@ compilar ou testar declara `requires` no manifesto; `profile` e `get` trazem a d
 Quando a máquina precisa só de uma parte de um módulo (uma ferramenta dentro de uma biblioteca grande), o
 perfil declara `sparse: {<id>: [pastas]}`: o módulo vem raso, sem blobs fora dessas pastas, no commit do
 gitlink e com o layout normal de submódulo (o modo cone também traz os arquivos da raiz). Um perfil que pede o
-módulo inteiro vence. `get` religa o módulo, e o
+módulo inteiro vence. Uma entrada com `*`, `?` ou `[` vale para todo módulo cujo caminho ou id combine
+(`prototypes/*`), inclusive os que entrarem no manifesto depois. `get` religa o módulo, e o
 perfil aplicado fica em `workspace.profile` no Git local.
 
 [gameops.py](../scripts/gameops.py) opera o Git do hub e dos módulos presentes:

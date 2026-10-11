@@ -249,6 +249,12 @@ class WorkspaceTest(unittest.TestCase):
         data["profiles"]["inteiro"] = {"modules": ["beta"]}
         self.assertEqual(workspace.profile_sparse(data, ["s", "inteiro"]), {})
 
+    def test_profile_patterns_expand_to_every_matching_module(self):
+        data = {"modules": self.modules, "profiles": {"g": {"modules": ["games/*"]}, "x": {"modules": ["demos/*"]}}}
+        self.assertEqual(sorted(workspace.profile_names(data, ["g"])), ["alpha", "alpha-qa", "beta"])
+        with self.assertRaisesRegex(ValueError, "demos/"):
+            workspace.profile_names(data, ["x"])
+
     def test_legacy_checkout_is_not_mistaken_for_a_submodule_hub(self):
         with self.assertRaisesRegex(ValueError, "não modularizado"):
             workspace.get_modules(self.source, ["alpha"], self.modules)

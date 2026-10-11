@@ -173,6 +173,20 @@ DISPOSABLE = (".DS_Store", "__pycache__", "*.pyc", ".pytest_cache", ".mypy_cache
 PROFILE_KEY = "workspace.profile"
 
 
+def expand(entries, modules):
+    """Troca cada padrão (`prototypes/*`) pelos módulos cujo caminho ou id combinam com ele."""
+    found = []
+    for entry in entries:
+        if not any(char in entry for char in "*?["):
+            found.append(entry)
+            continue
+        matches = [item["id"] for item in modules if fnmatch(item["path"], entry) or fnmatch(item["id"], entry)]
+        if not matches:
+            raise ValueError(f"Nenhum módulo combina com {entry}.")
+        found.extend(matches)
+    return found
+
+
 def profile_names(data, names):
     profiles = data.get("profiles") or {}
     if not isinstance(profiles, dict):
@@ -183,7 +197,7 @@ def profile_names(data, names):
         if not isinstance(profile, dict) or not isinstance(profile.get("modules"), list):
             known = ", ".join(sorted(profiles)) or "nenhum"
             raise ValueError(f"Perfil desconhecido: {name}. Perfis do workspace.json: {known}.")
-        wanted.extend(profile["modules"])
+        wanted.extend(expand(profile["modules"], data["modules"]))
         wanted.extend(profile.get("sparse") or {})
     return wanted
 
@@ -194,7 +208,7 @@ def profile_sparse(data, names):
     sparse, whole = {}, set()
     for name in names:
         profile = profiles.get(name) or {}
-        whole.update(profile.get("modules") or [])
+        whole.update(expand(profile.get("modules") or [], data["modules"]))
         for module, paths in (profile.get("sparse") or {}).items():
             if not isinstance(paths, list) or not paths or not all(isinstance(item, str) and item for item in paths):
                 raise ValueError(f"sparse de {module} no perfil {name} precisa ser uma lista de pastas")
